@@ -30,17 +30,55 @@
 // Connection program flags
 #define LATTICE_PROG_CONNECT_CONFIG_READ 8
 #define LATTICE_PROG_CONNECT_CONFIG_WRITE 16
-#define LATTICE_PROG_CONNECT_CONFIG_DEFAULT 32
+#define LATTICE_PROG_CONNECT_CONFIG_COEFF 32
+#define LATTICE_PROG_CONNECT_CONFIG_EXPONENT 64
+
+// Noise mode flags
+#define LATTICE_NOISE_MODE_NONE 0			// No noise is applied.
+#define LATTICE_NOISE_MODE_RANDOM 1			// Applies a random noise level on all connections. Marginally longer compute time.
+#define LATTICE_NOISE_MODE_FLUX 2			// Applies noise based on the relative flux from nearby cells. (typically those in a 2x3 around the connection)
+#define LATTICE_NOISE_MODE_RESIST 4			// Applies a resistive noise (some resistance is measured across connections and reduces the charge slightly).
+#define LATTICE_NOISE_MODE_HEAT_RESIST 8	// If resistive noise is enabled, heat increases due to resistance which creates more heat.
 
 // Return values
-#define LATTICE_STATE_OKAY 0
-#define LATTICE_STATE_ERR_OVERFLOW_CELL -1
-#define LATTICE_STATE_ERR_BAD_CONFIG -2
+#define LATTICE_STATE_OKAY 0				// No errors.
+#define LATTICE_STATE_ERR_OVERFLOW_CELL -1	// A cell overflowed its bounds.
+#define LATTICE_STATE_ERR_BAD_CONFIG -2		// A bad configuration was attempted.
+#define LATTICE_STATE_ERR_NOT_INIT -3		// The lattice was not initialized.
+#define LATTICE_STATE_ERR_UNKNOWN -4		// An unknown error occured.
 
 // SIMU Functions: functions dedicated to manipulating the simulated library. These will be undefined if SIMU_FUNC_DEFINED is not 1.
+
+/// <summary>
+/// Initializes the simulated lattice with the given dimensions. The X axis is generally used as the input/output axis, with X=0 being write-only, and X=MAX-1 being readable.
+/// </summary>
+/// <param name="X"></param>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <returns>An integer corresponding to the LATTICE_STATE values.</returns>
 int SIMU_Lattice_Init(int X, int Y, int Z);
+/// <summary>
+/// Examines any cell in the lattice for the purpose of debugging the simulation.
+/// </summary>
+/// <param name="X"></param>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <param name="cell">The value of the cell</param>
+/// <returns>An integer corresponding to the LATTICE_STATE</returns>
 int SIMU_Lattice_Examine(int X, int Y, int Z, double* cell);
+/// <summary>
+/// Changes the noise mode applied to the simulation on connections. Note that the more noise introduced, the longer compute time will run.
+/// </summary>
+/// <param name="mode"></param>
+/// <returns></returns>
+int SIMU_Lattice_NoiseMode(int mode);
+/// <summary>
+/// Changes the minimum wait time inbetween polls of the simulation.
+/// </summary>
+/// <param name="ts"></param>
+/// <returns></returns>
 int SIMU_Thread_Speed(double ts);
 
-// AnalogLatticeLibrary functions: proper accessible functions for general use functions.
-int ALL_Lattice_Program_Core(int X, int Y, int Z, char code)
+// AnalogLibrary lattice functions: proper accessible functions for general use functions.
+int Lattice_Program_Core(int X, int Y, int Z, char code);
+int Lattice_Program_Connect(int X, int Y, int Z, char code);
