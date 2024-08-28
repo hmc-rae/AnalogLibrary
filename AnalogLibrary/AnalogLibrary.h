@@ -9,29 +9,30 @@
 #pragma once
 
 // Information declarations
-#define SIMU_FUNC_DEFINED 1
-#define SIMU_LATTICE_GROUP_POWER 1
+#define SIMU_FUNC_DEFINED 1							// Denotes whether or not the simulation package is included. 
+#define SIMU_LATTICE_GROUP_POWER 1					// I forgot what this denotes.
+#define CELL_TYPE float								// The data type used by each cell
 
 // Core program flags
-#define LATTICE_PROG_CORE_MASK 4
-#define LATTICE_PROG_CORE_HOLDVAL 0
-#define LATTICE_PROG_CORE_SUM 1
-#define LATTICE_PROG_CORE_MULT 2
-#define LATTICE_PROG_CORE_INT 3
+#define LATTICE_PROG_CORE_MASK 4					// Mask for the core program flags.
+#define LATTICE_PROG_CORE_HOLDVAL 0					// Set the core to hold the value in the underbus.
+#define LATTICE_PROG_CORE_SUM 1						// Set the core to sum on its inputs.
+#define LATTICE_PROG_CORE_MULT 2					// Set the core to multiply its inputs.
+#define LATTICE_PROG_CORE_INT 3						// Set the core to integrate its inputs.
 
 // Connection selectors
-#define LATTICE_PROG_CONNECT_MASK 7
-#define LATTICE_PROG_CONNECT_PX 1
-#define LATTICE_PROG_CONNECT_NX 2
-#define LATTICE_PROG_CONNECT_PY 3
-#define LATTICE_PROG_CONNECT_NY 4
-#define LATTICE_PROG_CONNECT_PZ 5
-#define LATTICE_PROG_CONNECT_NZ 6
+#define LATTICE_PROG_CONNECT_MASK 7					// Mask for the lattice connection flags
+#define LATTICE_PROG_CONNECT_PX 0					// Positive X connection
+#define LATTICE_PROG_CONNECT_PY 1					// Positive Y connection
+#define LATTICE_PROG_CONNECT_PZ 2					// Positive Z connection
+#define LATTICE_PROG_CONNECT_NX 3					// Negative X connection
+#define LATTICE_PROG_CONNECT_NY 4					// Negative Y connection
+#define LATTICE_PROG_CONNECT_NZ 5					// Negative Z connection
 
 // Connection program flags
-#define LATTICE_PROG_CONNECT_CONFIG_READ 8
-#define LATTICE_PROG_CONNECT_CONFIG_WRITE 16
-#define LATTICE_PROG_CONNECT_CONFIG_COEFF 32
+#define LATTICE_PROG_CONNECT_CONFIG_READ 8			// Reads on the given connection
+#define LATTICE_PROG_CONNECT_CONFIG_WRITE 16		// this may be vestigial. we can optimize to do only connections on the positive axis to halve redundant connections.
+#define LATTICE_PROG_CONNECT_CONFIG_COEFF 32		
 #define LATTICE_PROG_CONNECT_CONFIG_INVERT 64
 
 // Noise mode flags
@@ -74,7 +75,7 @@ int SIMU_Lattice_Destroy();
 /// <param name="Z"></param>
 /// <param name="cell">The value of the cell</param>
 /// <returns>An integer corresponding to the LATTICE_STATE</returns>
-int SIMU_Lattice_Examine(int X, int Y, int Z, double* cell);
+int SIMU_Lattice_Examine(int X, int Y, int Z, CELL_TYPE* cell);
 /// <summary>
 /// Changes the noise mode applied to the simulation on connections. Note that the more noise introduced, the longer compute time will run.
 /// </summary>
@@ -113,4 +114,4 @@ int Lattice_Program_Connect(int X, int Y, int Z, int code);
 /// </summary>
 /// <param name="charge"></param>
 /// <returns></returns>
-int Lattice_Program_SetUnderbus(double charge);
+int Lattice_Program_SetUnderbus(CELL_TYPE charge);

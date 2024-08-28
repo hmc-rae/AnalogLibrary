@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "AnalogLibrary.h"
 #include <malloc.h>
+#include <thread>
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -22,11 +23,35 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     return TRUE;
 }
 
-typedef struct cell {
-    double cValue;
-    double pValue;
+#define POS_X 0
+#define POS_Y 1
+#define POS_Z 2
+#define NEG_X 3
+#define NEG_Y 4
+#define NEG_Z 5
+
+#define OPTIM_CONNECTIONS
+
+#ifdef OPTIM_CONNECTIONS
+    #define CONNECTION_COUNT 3
+#else
+    #define CONNECTION_COUNT 6
+#endif
+
+typedef struct connect {
+    CELL_TYPE modifier;
+    char modType;
 
     // TODO: some heat val
+};
+
+typedef struct cell {
+    CELL_TYPE cValue;
+    CELL_TYPE pValue;
+
+    char config;
+
+    connect connections[CONNECTION_COUNT];
 };
 
 cell* cells;
