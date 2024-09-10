@@ -40,14 +40,14 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 
 typedef struct connect {
     CELL_TYPE modifier;
-    char modType;
+    char config;
 
     // TODO: some heat val
 };
 
 typedef struct cell {
     CELL_TYPE charge;
-
+    bool flipswitch;
     char config;
 
     connect connections[CONNECTION_COUNT];
@@ -61,11 +61,57 @@ int noiseProfile;
 
 CELL_TYPE underbusCharge;
 
+/// <summary>
+/// gets the position in memory corresponding to the given values
+/// </summary>
+/// <param name="x"></param>
+/// <param name="y"></param>
+/// <param name="z"></param>
+/// <returns></returns>
 int get_mem_pos(int x, int y, int z) {
     // use Z as the largest factor, Y medium, X smallest
     return x
         + (y * xMax)
         + (z * XYMax);
+}
+
+/// <summary>
+/// returns the connection to be modified
+/// </summary>
+/// <param name="x"></param>
+/// <param name="y"></param>
+/// <param name="z"></param>
+/// <param name="connection"></param>
+/// <param name="ret"></param>
+/// <returns></returns>
+int get_connection(int x, int y, int z, int connection, connect** ret) {
+    int idx = get_mem_pos(x, y, z);
+    if (idx < 0 || idx >= MAX) return -1;
+    if (connection < 0 || connection > CONNECTION_COUNT) return -2;
+
+#ifdef OPTIM_CONNECTIONS
+    if (connection < 3) {
+#endif
+        cell* cell = &cells[idx];
+        *ret = &cell->connections[connection];
+        return 0;
+#ifdef OPTIM_CONNECTIONS
+    }
+    else {
+        switch (connection) {
+        case NEG_X:
+            x -= 1;
+            break;
+        case NEG_Y:
+            y -= 1;
+            break;
+        case NEG_Z:
+            z -= 1;
+            break;
+        }
+        return get_connection(x, y, z, connection - 3, ret);
+    }
+#endif
 }
 
 int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
@@ -79,14 +125,18 @@ int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
     timestep = ts;
     cells = new cell[MAX];
     underbusCharge = 0;
+
+    return MAX;
 }
 
 int Lattice_Program_SetUnderbus(CELL_TYPE charge) {
     underbusCharge = charge;
+    return 0;
 }
 
 int Lattice_Program_Core(int X, int Y, int Z, int code) {
     int idx = get_mem_pos(X, Y, Z);
+    if (idx < 0 || idx >= MAX) return -1;
 
     switch (code & LATTICE_PROG_CORE_MASK) {
     case LATTICE_PROG_CORE_HOLDVAL: // HOLDVAL
@@ -99,5 +149,20 @@ int Lattice_Program_Core(int X, int Y, int Z, int code) {
         cells[idx].config = code & LATTICE_PROG_CORE_MASK;
         break;
     }
-    
+    return 0;
+}
+
+int Lattice_Program_Connection(int X, int Y, int Z, int code) {
+    connect* connection = 0;
+    int connectionID = code & LATTICE_PROG_CONNECT_MASK;
+    if (!get_connection(X, Y, Z, connectionID, &connection))
+        return -1;
+
+    connection->config = (code & ~LATTICE_PROG_CONNECT_MASK) & 0xff;
+
+    if ((code & LATTICE_PROG_CONNECT_CONFIG_MOD) != 0) {
+        connection->modifier = underbusCharge;
+    }
+
+    return 0;
 }

@@ -33,13 +33,15 @@
 
 // Connection program flags
 #define LATTICE_PROG_CONNECT_CONFIG_ACTIVE 8		// This connection is active (in general)
-#define LATTICE_PROG_CONNECT_CONFIG_READ 0			// Reads on the given connection. Exclusive with write
-#define LATTICE_PROG_CONNECT_CONFIG_WRITE 16		// Writes on the given connection. Exclusive with read
+#define LATTICE_PROG_CONNECT_CONFIG_FLOW_POS 0		// Reads on the given connection. Exclusive with write.
+#define LATTICE_PROG_CONNECT_CONFIG_FLOW_NEG 16		// Writes on the given connection. Exclusive with read
+
 #define LATTICE_PROG_CONNECT_CONFIG_MOD 32			// A modifier is active on this connection
 #define LATTICE_PROG_CONNECT_CONFIG_MOD_COEFF 0		// Coefficient modifier. Excludes divisor.
 #define LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS 64	// Divisor modifier. Excludes coefficient.
+
 #define LATTICE_PROG_CONNECT_CONFIG_INVERT 64		// Invert this line. Inclusive of any config
-[hn ]
+
 // Noise mode flags
 #define LATTICE_NOISE_MODE_NONE 0				// No noise is applied.
 #define LATTICE_NOISE_MODE_RANDOM 1				// Applies a random noise level on all connections. Marginally longer compute time.
