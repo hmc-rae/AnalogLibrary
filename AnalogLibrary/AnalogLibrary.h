@@ -12,6 +12,8 @@
 #define SIMU_FUNC_DEFINED 1							// Denotes whether or not the simulation package is included. 
 #define SIMU_LATTICE_GROUP_POWER 1					// I forgot what this denotes.
 #define CELL_TYPE float								// The data type used by each cell
+//#define CELL_TYPE_USE_FIXED_POINT
+//#define OPTIM_MEMORY true							// If defined, utilizes optimized memory for faster memory by rounding dimensions to the nearest power of 2.
 
 // Core program flags
 #define LATTICE_PROG_CORE_MASK 4					// Mask for the core program flags.
@@ -30,11 +32,14 @@
 #define LATTICE_PROG_CONNECT_NZ 5					// Negative Z connection
 
 // Connection program flags
-#define LATTICE_PROG_CONNECT_CONFIG_READ 8			// Reads on the given connection
-#define LATTICE_PROG_CONNECT_CONFIG_WRITE 16		// this may be vestigial. we can optimize to do only connections on the positive axis to halve redundant connections.
-#define LATTICE_PROG_CONNECT_CONFIG_COEFF 32		
-#define LATTICE_PROG_CONNECT_CONFIG_INVERT 64
-
+#define LATTICE_PROG_CONNECT_CONFIG_ACTIVE 8		// This connection is active (in general)
+#define LATTICE_PROG_CONNECT_CONFIG_READ 0			// Reads on the given connection. Exclusive with write
+#define LATTICE_PROG_CONNECT_CONFIG_WRITE 16		// Writes on the given connection. Exclusive with read
+#define LATTICE_PROG_CONNECT_CONFIG_MOD 32			// A modifier is active on this connection
+#define LATTICE_PROG_CONNECT_CONFIG_MOD_COEFF 0		// Coefficient modifier. Excludes divisor.
+#define LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS 64	// Divisor modifier. Excludes coefficient.
+#define LATTICE_PROG_CONNECT_CONFIG_INVERT 64		// Invert this line. Inclusive of any config
+[hn ]
 // Noise mode flags
 #define LATTICE_NOISE_MODE_NONE 0				// No noise is applied.
 #define LATTICE_NOISE_MODE_RANDOM 1				// Applies a random noise level on all connections. Marginally longer compute time.

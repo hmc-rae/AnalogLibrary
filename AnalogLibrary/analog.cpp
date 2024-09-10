@@ -46,8 +46,7 @@ typedef struct connect {
 };
 
 typedef struct cell {
-    CELL_TYPE cValue;
-    CELL_TYPE pValue;
+    CELL_TYPE charge;
 
     char config;
 
@@ -55,9 +54,19 @@ typedef struct cell {
 };
 
 cell* cells;
-int MAX, xMax, yMax, zMax;
+double timestep;
+int MAX, xMax, yMax, zMax, XYMax;
 
 int noiseProfile;
+
+CELL_TYPE underbusCharge;
+
+int get_mem_pos(int x, int y, int z) {
+    // use Z as the largest factor, Y medium, X smallest
+    return x
+        + (y * xMax)
+        + (z * XYMax);
+}
 
 int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
     xMax = X;
@@ -65,7 +74,30 @@ int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
     zMax = Z;
 
     MAX = X * Y * Z;
+    XYMax = X * Y;
     noiseProfile = noise;
+    timestep = ts;
     cells = new cell[MAX];
+    underbusCharge = 0;
 }
 
+int Lattice_Program_SetUnderbus(CELL_TYPE charge) {
+    underbusCharge = charge;
+}
+
+int Lattice_Program_Core(int X, int Y, int Z, int code) {
+    int idx = get_mem_pos(X, Y, Z);
+
+    switch (code & LATTICE_PROG_CORE_MASK) {
+    case LATTICE_PROG_CORE_HOLDVAL: // HOLDVAL
+        cells[idx].charge = underbusCharge;
+        cells[idx].config = LATTICE_PROG_CORE_HOLDVAL;
+        break;
+    case LATTICE_PROG_CORE_SUM:
+    case LATTICE_PROG_CORE_MULT:
+    case LATTICE_PROG_CORE_INT:
+        cells[idx].config = code & LATTICE_PROG_CORE_MASK;
+        break;
+    }
+    
+}
