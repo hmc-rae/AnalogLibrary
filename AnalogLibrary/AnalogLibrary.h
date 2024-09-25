@@ -13,7 +13,7 @@
 #define SIMU_LATTICE_GROUP_POWER 1					// I forgot what this denotes.
 #define CELL_TYPE float								// The data type used by each cell
 //#define CELL_TYPE_USE_FIXED_POINT
-//#define OPTIM_MEMORY true							// If defined, utilizes optimized memory for faster memory by rounding dimensions to the nearest power of 2.
+#define OPTIM_MEMORY true							// If defined, utilizes optimized memory for faster memory by rounding dimensions to the nearest power of 2.
 
 // Core program flags
 #define LATTICE_PROG_CORE_MASK 4					// Mask for the core program flags.
@@ -41,6 +41,7 @@
 #define LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS 64	// Divisor modifier. Excludes coefficient.
 
 #define LATTICE_PROG_CONNECT_CONFIG_INVERT 64		// Invert this line. Inclusive of any config
+#define LATTICE_PROG_CONNECT_CONFIG_ABSOLUTE 128	// Absolute this line. Inclusive of any config
 
 // Noise mode flags
 #define LATTICE_NOISE_MODE_NONE 0				// No noise is applied.
@@ -55,6 +56,9 @@
 #define LATTICE_STATE_ERR_BAD_CONFIG -2		// A bad configuration was attempted.
 #define LATTICE_STATE_ERR_NOT_INIT -3		// The lattice was not initialized.
 #define LATTICE_STATE_ERR_UNKNOWN -4		// An unknown error occured.
+#define LATTICE_STATE_ERR_DIV_ZERO -5		// Division by zero occurred
+
+#define LATTICE_DEFAULT_DIV_ZERO 0
 
 // SIMU Functions: functions dedicated to manipulating the simulated library. These will be undefined if SIMU_FUNC_DEFINED is not 1.
 

@@ -1,5 +1,4 @@
 ﻿  analog.cpp
-D:\Files\Programming\Projects\AnalogLibrary\AnalogLibrary\analog.cpp(51,2): warning C4091: 'typedef ': ignored on left of 'connect' when no variable is declared
-D:\Files\Programming\Projects\AnalogLibrary\AnalogLibrary\analog.cpp(59,2): warning C4091: 'typedef ': ignored on left of 'cell' when no variable is declared
-D:\Files\Programming\Projects\AnalogLibrary\AnalogLibrary\analog.cpp(167): warning C4715: 'Lattice_Program_Connection': not all control paths return a value
-  AnalogLibrary.vcxproj -> D:\Files\Programming\Projects\AnalogLibrary\x64\Debug\AnalogLibrary.dll
+C:\Users\harry\Desktop\files\PROJECTS\AnalogLibrary\AnalogLibrary\analog.cpp(46,2): warning C4091: 'typedef ': ignored on left of 'connect' when no variable is declared
+C:\Users\harry\Desktop\files\PROJECTS\AnalogLibrary\AnalogLibrary\analog.cpp(54,2): warning C4091: 'typedef ': ignored on left of 'cell' when no variable is declared
+C:\Users\harry\Desktop\files\PROJECTS\AnalogLibrary\AnalogLibrary\analog.cpp(124): error C4716: 'SIMU_Lattice_Run': must return a value
