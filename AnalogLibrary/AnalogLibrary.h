@@ -52,13 +52,13 @@
 
 // Return values
 #define LATTICE_STATE_OKAY 0				// No errors.
-#define LATTICE_STATE_ERR_OVERFLOW_CELL -1	// A cell overflowed its bounds.
-#define LATTICE_STATE_ERR_BAD_CONFIG -2		// A bad configuration was attempted.
-#define LATTICE_STATE_ERR_NOT_INIT -3		// The lattice was not initialized.
-#define LATTICE_STATE_ERR_UNKNOWN -4		// An unknown error occured.
-#define LATTICE_STATE_ERR_DIV_ZERO -5		// Division by zero occurred
+#define LATTICE_STATE_ERR_OVERFLOW_CELL 1	// A cell overflowed its bounds.
+#define LATTICE_STATE_ERR_BAD_CONFIG 2		// A bad configuration was attempted.
+#define LATTICE_STATE_ERR_NOT_INIT 4		// The lattice was not initialized.
+#define LATTICE_STATE_ERR_UNKNOWN 8			// An unknown error occured.
+#define LATTICE_STATE_ERR_DIV_ZERO 16		// Division by zero occurred
 
-#define LATTICE_DEFAULT_DIV_ZERO 0
+#define LATTICE_DEFAULT_DIV_ZERO 0			// Value to default to when a DIV ZERO has occurred.
 
 // SIMU Functions: functions dedicated to manipulating the simulated library. These will be undefined if SIMU_FUNC_DEFINED is not 1.
 

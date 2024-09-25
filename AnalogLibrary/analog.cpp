@@ -5,8 +5,10 @@
 #include "pch.h"
 #include "AnalogLibrary.h"
 #include <malloc.h>
+#include <Windows.h>
 #include <thread>
 #include <vector>
+#include <chrono>
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -71,6 +73,8 @@ std::thread _simu_thread;
 std::vector<int> _simu_integrators;
 std::vector<int> _simu_endpoints;
 
+std::chrono::high_resolution_clock _clock;
+
 /// <summary>
 /// gets the position in memory corresponding to the given values
 /// </summary>
@@ -122,9 +126,48 @@ int get_connection(int x, int y, int z, int connection, connect** ret) {
     }
 #endif
 }
+/// <summary>
+/// returns the connection indicated
+/// </summary>
+/// <param name="idx"></param>
+/// <param name="connection"></param>
+/// <param name="ret"></param>
+/// <returns></returns>
 int get_connection(int idx, int connection, connect** ret) {
+    if (idx < 0 || idx >= MAX) return -1;
+    if (connection < 0 || connection > CONNECTION_COUNT) return -2;
+
+#ifdef OPTIM_CONNECTIONS
+    if (connection < 3) {
+#endif
+        cell* cell = &cells[idx];
+        *ret = &cell->connections[connection];
+        return 0;
+#ifdef OPTIM_CONNECTIONS
+    }
+    else {
+        idx -= connectionDelta[connection];
+        return get_connection(idx, connection - 3, ret);
+    }
+#endif
+}
+
+int register_into_vector(int idx, std::vector<int>* vector) {
+    vector->push_back(idx);
     return 0;
 }
+int deregister_into_vector(int idx, std::vector<int>* vector) {
+    for (int i = 0; i < vector->size(); i++) {
+        if (vector->at(i) == idx) {
+            vector->operator[](i) = vector->at(vector->size() - 1);
+            vector->pop_back();
+            return 0;
+        }
+    }
+    return 0;
+}
+
+// returns 1 if the given connection flows to origin, else 0
 int get_is_connection_to_me(int oX, int oY, int oZ, int connection) {
     connect* connector = 0;
     get_connection(oX, oY, oZ, connection, &connector);
@@ -138,7 +181,8 @@ int get_is_connection_to_me(int oX, int oY, int oZ, int connection) {
     }
     return 0;
 }
-CELL_TYPE get_value_through_connection(int idx, connect* connection) {
+int get_value_through_connection(int idx, connect* connection, CELL_TYPE* output) {
+    int flags = 0;
     CELL_TYPE val = cells[idx].charge;
     char config = connection->config;
 
@@ -146,8 +190,11 @@ CELL_TYPE get_value_through_connection(int idx, connect* connection) {
     // ignore directionality
     if (config & LATTICE_PROG_CONNECT_CONFIG_MOD) {
         if (config & LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS) {
-            if (connection->modifier == 0) val = LATTICE_DEFAULT_DIV_ZERO;
-            else val = val / connection->modifier;
+            if (connection->modifier == 0) {
+                val = LATTICE_DEFAULT_DIV_ZERO;
+                flags |= LATTICE_STATE_ERR_DIV_ZERO;
+            }
+            val = val / connection->modifier;
         }
         else {
             val = val * connection->modifier;
@@ -160,9 +207,14 @@ CELL_TYPE get_value_through_connection(int idx, connect* connection) {
     if (config & LATTICE_PROG_CONNECT_CONFIG_INVERT)
         val = -val;
 
-    return val;
+    *output = val;
+
+    return flags;
 }
-int SIMU_recursive_operate(int idx, bool flip) {
+
+
+int recursive_operate(int idx, bool flip, double dt) {
+    int flags = 0;
     //if flipped, return instantly as we can assume its been computed
     if (cells[idx].flipswitch == flip)
         return -1;
@@ -173,23 +225,51 @@ int SIMU_recursive_operate(int idx, bool flip) {
     int k = 0;
     for (int i = 0; i < ALL_CONNECTIONS; i++) {
         if (!get_is_connection_to_me(cells[idx].x, cells[idx].y, cells[idx].z, i)) continue;
-        SIMU_recursive_operate(idx + connectionDelta[i], flip);
+        flags |= recursive_operate(idx + connectionDelta[i], flip, dt);
         connect* connector = 0;
         get_connection(cells[idx].x, cells[idx].y, cells[idx].z, i, &connector);
-        cell_values[k++] = get_value_through_connection(idx + connectionDelta[i], connector);
+        flags |= get_value_through_connection(idx + connectionDelta[i], connector, &cell_values[k++]);
     }
 
     // OPERATE ON ALL VALUES WE RECEIVE IN THIS FRAME
-    for (int i = 0; i < k; i++) {
-
+    switch (cells[idx].config & LATTICE_PROG_CORE_MASK) {
+        case LATTICE_PROG_CORE_SUM:
+            cells[idx].charge = 0;
+            for (int i = 0; i < k; i++) 
+                cells[idx].charge += cell_values[i];
+            break;
+        case LATTICE_PROG_CORE_MULT:
+            cells[idx].charge = 1;
+            for (int i = 0; i < k; i++) 
+                cells[idx].charge *= cell_values[i];
+            break;
+        case LATTICE_PROG_CORE_INT:
+            for (int i = 0; i < k; i++)
+                cells[idx].charge += (CELL_TYPE)(cell_values[i] * dt);
+            break;
     }
 
-    return 0;
+    if (abs(cells[idx].charge) > 1) flags |= LATTICE_STATE_ERR_OVERFLOW_CELL;
+
+    return flags;
 }
 int SIMU_Lattice_Run() {
     bool flipswitch = true;
+    double dt = timestep;
     while (_simu_running) {
+        // check all _simu_integrators
+        for (int i = 0; i < _simu_integrators.size(); i++) {
+            recursive_operate(_simu_integrators[i], flipswitch, dt);
+        }
+        // check all _simu_endpoints
+        for (int i = 0; i < _simu_endpoints.size(); i++) {
+            recursive_operate(_simu_endpoints[i], flipswitch, dt);
+        }
 
+        // sleep for timestep
+        // TODO: timestep accounting - this is a brute force thing
+        std::this_thread::sleep_for(std::chrono::milliseconds((int)(timestep * 1000)));
+        flipswitch = !flipswitch;
     }
 
     return 0;
@@ -229,15 +309,23 @@ int Lattice_Program_Core(int X, int Y, int Z, int code) {
     int idx = get_mem_pos(X, Y, Z);
     if (idx < 0 || idx >= MAX) return -1;
 
+    if (X == xMax - 1 && cells[idx].config == 0) {
+        register_into_vector(idx, &_simu_endpoints);
+    }
+
     switch (code & LATTICE_PROG_CORE_MASK) {
-    case LATTICE_PROG_CORE_HOLDVAL: // HOLDVAL
-        cells[idx].charge = underbusCharge;
-        cells[idx].config = LATTICE_PROG_CORE_HOLDVAL;
+    case LATTICE_PROG_CORE_INT:
+        if ((cells[idx].config & LATTICE_PROG_CORE_MASK) != LATTICE_PROG_CORE_INT)
+            register_into_vector(idx, &_simu_integrators);
+        cells[idx].config = code;
         break;
+    case LATTICE_PROG_CORE_HOLDVAL:
+        cells[idx].charge = underbusCharge;
     case LATTICE_PROG_CORE_SUM:
     case LATTICE_PROG_CORE_MULT:
-    case LATTICE_PROG_CORE_INT:
-        cells[idx].config = code & LATTICE_PROG_CORE_MASK;
+        if ((cells[idx].config & LATTICE_PROG_CORE_MASK) == LATTICE_PROG_CORE_INT)
+            deregister_into_vector(idx, &_simu_integrators);
+        cells[idx].config = code;
         break;
     }
     return 0;
