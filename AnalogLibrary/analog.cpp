@@ -212,7 +212,6 @@ int get_value_through_connection(int idx, connect* connection, CELL_TYPE* output
     return flags;
 }
 
-
 int recursive_operate(int idx, bool flip, double dt) {
     int flags = 0;
     //if flipped, return instantly as we can assume its been computed
@@ -253,6 +252,7 @@ int recursive_operate(int idx, bool flip, double dt) {
 
     return flags;
 }
+
 int SIMU_Lattice_Run() {
     bool flipswitch = true;
     double dt = timestep;
@@ -297,14 +297,27 @@ int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
     _simu_running = 1;
     _simu_thread = std::thread(SIMU_Lattice_Run);
 
-    return MAX;
+    return LATTICE_STATE_OKAY;
+}
+int SIMU_Thread_Speed(double ts) {
+    if (ts < 0) return LATTICE_STATE_ERR_BAD_CONFIG;
+    timestep = ts;
+    return LATTICE_STATE_OKAY;
+}
+int SIMU_Lattice_Examine(int X, int Y, int Z, CELL_TYPE* cell) {
+    int idx = get_mem_pos(X, Y, Z);
+    if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
+    *cell = cells[idx].charge;
+    return LATTICE_STATE_OKAY;
+}
+int SIMU_Lattice_NoiseMode(int mode) {
+    return LATTICE_STATE_ERR_UNDEFINED;
 }
 
 int Lattice_Program_SetUnderbus(CELL_TYPE charge) {
     underbusCharge = charge;
     return 0;
 }
-
 int Lattice_Program_Core(int X, int Y, int Z, int code) {
     int idx = get_mem_pos(X, Y, Z);
     if (idx < 0 || idx >= MAX) return -1;
@@ -330,8 +343,7 @@ int Lattice_Program_Core(int X, int Y, int Z, int code) {
     }
     return 0;
 }
-
-int Lattice_Program_Connection(int X, int Y, int Z, int code) {
+int Lattice_Program_Connect(int X, int Y, int Z, int code) {
     connect* connection = 0;
     int connectionID = code & LATTICE_PROG_CONNECT_MASK;
     if (!get_connection(X, Y, Z, connectionID, &connection))

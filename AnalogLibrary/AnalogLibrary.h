@@ -57,6 +57,8 @@
 #define LATTICE_STATE_ERR_NOT_INIT 4		// The lattice was not initialized.
 #define LATTICE_STATE_ERR_UNKNOWN 8			// An unknown error occured.
 #define LATTICE_STATE_ERR_DIV_ZERO 16		// Division by zero occurred
+#define LATTICE_STATE_ERR_BAD_CELL_POS 32	// Attempted to load a cell out of bounds.
+#define LATTICE_STATE_ERR_UNDEFINED 64		// This function has not been defined yet.
 
 #define LATTICE_DEFAULT_DIV_ZERO 0			// Value to default to when a DIV ZERO has occurred.
 
