@@ -16,7 +16,7 @@
 #define OPTIM_MEMORY true							// If defined, utilizes optimized memory for faster memory by rounding dimensions to the nearest power of 2.
 
 // Core program flags
-#define LATTICE_PROG_CORE_MASK 4					// Mask for the core program flags.
+#define LATTICE_PROG_CORE_MASK 3					// Mask for the core program flags.
 #define LATTICE_PROG_CORE_HOLDVAL 0					// Set the core to hold the value in the underbus.
 #define LATTICE_PROG_CORE_SUM 1						// Set the core to sum on its inputs.
 #define LATTICE_PROG_CORE_MULT 2					// Set the core to multiply its inputs.
@@ -33,8 +33,8 @@
 
 // Connection program flags
 #define LATTICE_PROG_CONNECT_CONFIG_ACTIVE 8		// This connection is active (in general)
-#define LATTICE_PROG_CONNECT_CONFIG_FLOW_POS 0		// Reads on the given connection. Exclusive with write.
-#define LATTICE_PROG_CONNECT_CONFIG_FLOW_NEG 16		// Writes on the given connection. Exclusive with read
+#define LATTICE_PROG_CONNECT_CONFIG_FLOW_POS 0		// Flows to the positive-axis cell. 
+#define LATTICE_PROG_CONNECT_CONFIG_FLOW_NEG 16		// Flows to the negative-axis cell.
 
 #define LATTICE_PROG_CONNECT_CONFIG_MOD 32			// A modifier is active on this connection
 #define LATTICE_PROG_CONNECT_CONFIG_MOD_COEFF 0		// Coefficient modifier. Excludes divisor.
@@ -59,6 +59,7 @@
 #define LATTICE_STATE_ERR_DIV_ZERO 16		// Division by zero occurred
 #define LATTICE_STATE_ERR_BAD_CELL_POS 32	// Attempted to load a cell out of bounds.
 #define LATTICE_STATE_ERR_UNDEFINED 64		// This function has not been defined yet.
+#define LATTICE_STATE_ERR_NO_CONNECTION 128 // No connection here.
 
 #define LATTICE_DEFAULT_DIV_ZERO 0			// Value to default to when a DIV ZERO has occurred.
 
@@ -128,3 +129,19 @@ int Lattice_Program_Connect(int X, int Y, int Z, int code);
 /// <param name="charge"></param>
 /// <returns></returns>
 int Lattice_Program_SetUnderbus(CELL_TYPE charge);
+/// <summary>
+/// Inputs a value to {X=0, Y, Z} (input layer).
+/// </summary>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <param name="charge"></param>
+/// <returns></returns>
+int Lattice_Write(int Y, int Z, CELL_TYPE charge);
+/// <summary>
+/// Reads the value from cell {X=MAX-1, Y, Z} (output layer).
+/// </summary>
+/// <param name="Y"></param>/// 
+/// <param name="Z"></param>/// 
+/// <param name="output"></param>/// 
+/// <returns></returns>
+int Lattice_Read(int Y, int Z, CELL_TYPE* output);

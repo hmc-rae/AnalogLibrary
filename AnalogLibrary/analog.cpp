@@ -6,6 +6,7 @@
 #include "AnalogLibrary.h"
 #include <malloc.h>
 #include <Windows.h>
+#include <iostream>
 #include <thread>
 #include <vector>
 #include <chrono>
@@ -48,6 +49,11 @@ typedef struct connect {
     char config;
 
     // TODO: some heat val
+
+    connect() {
+        modifier = 0;
+        config = 0;
+    }
 };
 
 typedef struct cell {
@@ -56,6 +62,25 @@ typedef struct cell {
     char config;
     int x, y, z;
     connect connections[CONNECTION_COUNT];
+
+    cell() {
+        x = y = z = 0;
+        flipswitch = false;
+        charge = 0;
+        config = 0;
+        for (int i = 0; i < CONNECTION_COUNT; i++) {
+            connections[i] = connect();
+        }
+    }
+    cell(int X, int Y, int Z) {
+        for (int i = 0; i < CONNECTION_COUNT; i++) {
+            connections[i] = connect();
+        }
+        x = X, y = Y, z = Z;
+        flipswitch = false;
+        charge = 0;
+        config = 0;
+    }
 };
 
 cell* cells;
@@ -99,15 +124,15 @@ int get_mem_pos(int x, int y, int z) {
 /// <returns></returns>
 int get_connection(int x, int y, int z, int connection, connect** ret) {
     int idx = get_mem_pos(x, y, z);
-    if (idx < 0 || idx >= MAX) return -1;
-    if (connection < 0 || connection > CONNECTION_COUNT) return -2;
+    if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
+    if (connection < 0 || connection > ALL_CONNECTIONS) return LATTICE_STATE_ERR_BAD_CELL_POS;
 
 #ifdef OPTIM_CONNECTIONS
     if (connection < 3) {
 #endif
         cell* cell = &cells[idx];
         *ret = &cell->connections[connection];
-        return 0;
+        return LATTICE_STATE_OKAY;
 #ifdef OPTIM_CONNECTIONS
     }
     else {
@@ -122,6 +147,7 @@ int get_connection(int x, int y, int z, int connection, connect** ret) {
             z -= 1;
             break;
         }
+        if (x < 0 || y < 0 || z < 0) return LATTICE_STATE_ERR_NO_CONNECTION;
         return get_connection(x, y, z, connection - 3, ret);
     }
 #endif
@@ -135,7 +161,7 @@ int get_connection(int x, int y, int z, int connection, connect** ret) {
 /// <returns></returns>
 int get_connection(int idx, int connection, connect** ret) {
     if (idx < 0 || idx >= MAX) return -1;
-    if (connection < 0 || connection > CONNECTION_COUNT) return -2;
+    if (connection < 0 || connection > ALL_CONNECTIONS) return -2;
 
 #ifdef OPTIM_CONNECTIONS
     if (connection < 3) {
@@ -147,6 +173,7 @@ int get_connection(int idx, int connection, connect** ret) {
     }
     else {
         idx -= connectionDelta[connection];
+        if (idx < 0) return LATTICE_STATE_ERR_NO_CONNECTION;
         return get_connection(idx, connection - 3, ret);
     }
 #endif
@@ -170,8 +197,8 @@ int deregister_into_vector(int idx, std::vector<int>* vector) {
 // returns 1 if the given connection flows to origin, else 0
 int get_is_connection_to_me(int oX, int oY, int oZ, int connection) {
     connect* connector = 0;
-    get_connection(oX, oY, oZ, connection, &connector);
-
+    int code = get_connection(oX, oY, oZ, connection, &connector);
+    if (code == LATTICE_STATE_ERR_NO_CONNECTION) return 0;
     if (!(connector->config & LATTICE_PROG_CONNECT_CONFIG_ACTIVE)) return 0;
 
     // Get the connection: if it is on a negative axis (>2) and is to positive, its to me, OR if it is on positive axis <3 and to negative
@@ -223,7 +250,8 @@ int recursive_operate(int idx, bool flip, double dt) {
     CELL_TYPE cell_values[ALL_CONNECTIONS] = { 0, 0, 0, 0, 0, 0 };
     int k = 0;
     for (int i = 0; i < ALL_CONNECTIONS; i++) {
-        if (!get_is_connection_to_me(cells[idx].x, cells[idx].y, cells[idx].z, i)) continue;
+        int toMe = get_is_connection_to_me(cells[idx].x, cells[idx].y, cells[idx].z, i);
+        if (!toMe) continue;
         flags |= recursive_operate(idx + connectionDelta[i], flip, dt);
         connect* connector = 0;
         get_connection(cells[idx].x, cells[idx].y, cells[idx].z, i, &connector);
@@ -256,6 +284,7 @@ int recursive_operate(int idx, bool flip, double dt) {
 int SIMU_Lattice_Run() {
     bool flipswitch = true;
     double dt = timestep;
+    _simu_running = 1;
     while (_simu_running) {
         // check all _simu_integrators
         for (int i = 0; i < _simu_integrators.size(); i++) {
@@ -284,6 +313,16 @@ int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
     noiseProfile = noise;
     timestep = ts;
     cells = new cell[MAX];
+
+    for (int x = 0; x < X; x++) {
+        for (int y = 0; y < Y; y++) {
+            for (int z = 0; z < Z; z++) {
+                int idx = get_mem_pos(x, y, z);
+                cells[idx] = cell(x, y, z);
+            }
+        }
+    }
+
     underbusCharge = 0;
 
     connectionDelta[POS_X] = get_mem_pos(2, 1, 1) - get_mem_pos(1, 1, 1);
@@ -313,40 +352,47 @@ int SIMU_Lattice_Examine(int X, int Y, int Z, CELL_TYPE* cell) {
 int SIMU_Lattice_NoiseMode(int mode) {
     return LATTICE_STATE_ERR_UNDEFINED;
 }
+int SIMU_Lattice_Destroy() {
+    _simu_running = 0;
+    _simu_thread.join();
+    free(cells);
+    return 0;
+}
 
 int Lattice_Program_SetUnderbus(CELL_TYPE charge) {
     underbusCharge = charge;
-    return 0;
+    return LATTICE_STATE_OKAY;
 }
 int Lattice_Program_Core(int X, int Y, int Z, int code) {
     int idx = get_mem_pos(X, Y, Z);
-    if (idx < 0 || idx >= MAX) return -1;
+    if (X == 0) return -1; // input layer cant be programmed.
+    if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
 
     if (X == xMax - 1 && cells[idx].config == 0) {
         register_into_vector(idx, &_simu_endpoints);
     }
 
     switch (code & LATTICE_PROG_CORE_MASK) {
-    case LATTICE_PROG_CORE_INT:
-        if ((cells[idx].config & LATTICE_PROG_CORE_MASK) != LATTICE_PROG_CORE_INT)
-            register_into_vector(idx, &_simu_integrators);
-        cells[idx].config = code;
-        break;
-    case LATTICE_PROG_CORE_HOLDVAL:
-        cells[idx].charge = underbusCharge;
-    case LATTICE_PROG_CORE_SUM:
-    case LATTICE_PROG_CORE_MULT:
-        if ((cells[idx].config & LATTICE_PROG_CORE_MASK) == LATTICE_PROG_CORE_INT)
-            deregister_into_vector(idx, &_simu_integrators);
-        cells[idx].config = code;
-        break;
+        case LATTICE_PROG_CORE_INT:
+            if ((cells[idx].config & LATTICE_PROG_CORE_MASK) != LATTICE_PROG_CORE_INT)
+                register_into_vector(idx, &_simu_integrators);
+            cells[idx].config = code;
+            break;
+        case LATTICE_PROG_CORE_HOLDVAL:
+            cells[idx].charge = underbusCharge;
+        case LATTICE_PROG_CORE_SUM:
+        case LATTICE_PROG_CORE_MULT:
+            if ((cells[idx].config & LATTICE_PROG_CORE_MASK) == LATTICE_PROG_CORE_INT)
+                deregister_into_vector(idx, &_simu_integrators);
+            cells[idx].config = code;
+            break;
     }
-    return 0;
+    return LATTICE_STATE_OKAY;
 }
 int Lattice_Program_Connect(int X, int Y, int Z, int code) {
     connect* connection = 0;
     int connectionID = code & LATTICE_PROG_CONNECT_MASK;
-    if (!get_connection(X, Y, Z, connectionID, &connection))
+    if (get_connection(X, Y, Z, connectionID, &connection))
         return -1;
 
     connection->config = (code & ~LATTICE_PROG_CONNECT_MASK) & 0xff;
@@ -355,5 +401,17 @@ int Lattice_Program_Connect(int X, int Y, int Z, int code) {
         connection->modifier = underbusCharge;
     }
 
-    return 0;
+    return LATTICE_STATE_OKAY;
+}
+int Lattice_Write(int Y, int Z, CELL_TYPE charge) {
+    int idx = get_mem_pos(0, Y, Z);
+    if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
+    cells[idx].charge = charge;
+    return LATTICE_STATE_OKAY;
+}
+int Lattice_Read(int Y, int Z, CELL_TYPE* output) {
+    int idx = get_mem_pos(xMax - 1, Y, Z);
+    if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
+    *output = cells[idx].charge;
+    return LATTICE_STATE_OKAY;
 }
