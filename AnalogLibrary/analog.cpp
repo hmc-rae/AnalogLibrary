@@ -42,6 +42,9 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     #define CONNECTION_COUNT 6
 #endif
 
+#define LATTICE_PROG_CONNECT_CONFIG_ACTIVE 7		// Internal use only!
+#define NANOS_SECOND (double)1000000000
+
 #define abs(x) (x < 0 ? -x : x)
 
 typedef struct connect {
@@ -90,6 +93,8 @@ int MAX, xMax, yMax, zMax, XYMax;
 int connectionDelta[ALL_CONNECTIONS];
 
 int noiseProfile;
+
+int isIntegrating;
 
 CELL_TYPE underbusCharge;
 
@@ -213,19 +218,33 @@ int get_value_through_connection(int idx, connect* connection, CELL_TYPE* output
     CELL_TYPE val = cells[idx].charge;
     char config = connection->config;
 
-    if (!config & LATTICE_PROG_CONNECT_CONFIG_ACTIVE) return 0;
-    // ignore directionality
-    if (config & LATTICE_PROG_CONNECT_CONFIG_MOD) {
-        if (config & LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS) {
-            if (connection->modifier == 0) {
-                val = LATTICE_DEFAULT_DIV_ZERO;
-                flags |= LATTICE_STATE_ERR_DIV_ZERO;
-            }
-            val = val / connection->modifier;
+    if (!(config & LATTICE_PROG_CONNECT_CONFIG_ACTIVE)) return 0;
+
+    // ignore directionality, as its assumed to be correct.
+    
+    switch (config & LATTICE_PROG_CONNECT_CONFIG_MOD_MASK) {
+    case LATTICE_PROG_CONNECT_CONFIG_MOD_COEFF:
+        val *= connection->modifier;
+        break;
+    case LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS:
+        if (connection->modifier == 0) {
+            val = LATTICE_DEFAULT_DIV_ZERO;
+            flags |= LATTICE_STATE_ERR_DIV_ZERO;
         }
         else {
-            val = val * connection->modifier;
+            val = val / connection->modifier; 
+            if (abs(val) > 1) {
+                val = 0;
+                flags |= LATTICE_STATE_ERR_OVERFLOW_CELL;
+            }
         }
+        break;
+    case LATTICE_PROG_CONNECT_CONFIG_MOD_COMP:
+        if (val == connection->modifier) val = 0;
+        else if (val < connection->modifier) val = -1;
+        else val = 1;
+
+        break;
     }
 
     if (config & LATTICE_PROG_CONNECT_CONFIG_ABSOLUTE) 
@@ -240,10 +259,15 @@ int get_value_through_connection(int idx, connect* connection, CELL_TYPE* output
 }
 
 int recursive_operate(int idx, bool flip, double dt) {
+    if (idx == 3) {
+        //std::cout << "Operating on cell #" << idx << std::endl;
+        int k = 1;
+    }
     int flags = 0;
     //if flipped, return instantly as we can assume its been computed
     if (cells[idx].flipswitch == flip)
         return -1;
+
     cells[idx].flipswitch = flip;
 
     // check all connections to see if theyre TO this cell, or AWAY from this cell
@@ -285,19 +309,27 @@ int SIMU_Lattice_Run() {
     bool flipswitch = true;
     double dt = timestep;
     _simu_running = 1;
+    std::cout << "Simulation running!" << std::endl;
     while (_simu_running) {
+        auto start = std::chrono::system_clock::now();
+
         // check all _simu_integrators
         for (int i = 0; i < _simu_integrators.size(); i++) {
             recursive_operate(_simu_integrators[i], flipswitch, dt);
         }
+
         // check all _simu_endpoints
         for (int i = 0; i < _simu_endpoints.size(); i++) {
+            //std::cout << "Operating on endpoint vector " << (_simu_endpoints[i]) << std::endl;
             recursive_operate(_simu_endpoints[i], flipswitch, dt);
         }
 
-        // sleep for timestep
-        // TODO: timestep accounting - this is a brute force thing
-        std::this_thread::sleep_for(std::chrono::milliseconds((int)(timestep * 1000)));
+        
+        auto end = std::chrono::system_clock::now();
+        auto millis = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+        dt = (double)millis / NANOS_SECOND;
+        timestep = dt;
+
         flipswitch = !flipswitch;
     }
 
@@ -331,8 +363,7 @@ int SIMU_Lattice_Init(int X, int Y, int Z, int noise, double ts) {
     connectionDelta[NEG_X] = get_mem_pos(0, 1, 1) - get_mem_pos(1, 1, 1);
     connectionDelta[NEG_Y] = get_mem_pos(1, 0, 1) - get_mem_pos(1, 1, 1);
     connectionDelta[NEG_Z] = get_mem_pos(1, 1, 0) - get_mem_pos(1, 1, 1);
-
-    // TODO: start thread running and checking all active input/output layers
+    
     _simu_running = 1;
     _simu_thread = std::thread(SIMU_Lattice_Run);
 
@@ -358,11 +389,27 @@ int SIMU_Lattice_Destroy() {
     free(cells);
     return 0;
 }
+int SIMU_Poll_Rate() {
+    return (int)(1 / timestep);
+}
 
 int Lattice_Program_SetUnderbus(CELL_TYPE charge) {
     underbusCharge = charge;
     return LATTICE_STATE_OKAY;
 }
+int Lattice_Program_SetUnderbus(CELL_TYPE value, CELL_TYPE range) {
+    if (range < value) return LATTICE_STATE_ERR_OVERFLOW_CELL;
+    if (range == 0) return LATTICE_STATE_ERR_DIV_ZERO;
+    underbusCharge = value / range;
+    return LATTICE_STATE_OKAY;
+}
+int Lattice_Program_SetUnderbus(int value, int range) {
+    if (range < value) return LATTICE_STATE_ERR_OVERFLOW_CELL;
+    if (range == 0) return LATTICE_STATE_ERR_DIV_ZERO;
+    underbusCharge = (double)value / (double)range;
+    return LATTICE_STATE_OKAY;
+}
+
 int Lattice_Program_Core(int X, int Y, int Z, int code) {
     int idx = get_mem_pos(X, Y, Z);
     if (X == 0) return -1; // input layer cant be programmed.
@@ -394,24 +441,65 @@ int Lattice_Program_Connect(int X, int Y, int Z, int code) {
     int connectionID = code & LATTICE_PROG_CONNECT_MASK;
     if (get_connection(X, Y, Z, connectionID, &connection))
         return -1;
-
+    if (code & LATTICE_PROG_CONNECT_CONFIG_DEACTIVATE) {
+        connection->config = 0;
+        return LATTICE_STATE_OKAY;
+    }
     connection->config = (code & ~LATTICE_PROG_CONNECT_MASK) & 0xff;
+    connection->config |= LATTICE_PROG_CONNECT_CONFIG_ACTIVE;
 
-    if ((code & LATTICE_PROG_CONNECT_CONFIG_MOD) != 0) {
+    if ((code & LATTICE_PROG_CONNECT_CONFIG_MOD_MASK) != 0) {
         connection->modifier = underbusCharge;
     }
 
     return LATTICE_STATE_OKAY;
 }
+
 int Lattice_Write(int Y, int Z, CELL_TYPE charge) {
     int idx = get_mem_pos(0, Y, Z);
     if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
     cells[idx].charge = charge;
     return LATTICE_STATE_OKAY;
 }
+int Lattice_Write(int Y, int Z, CELL_TYPE value, CELL_TYPE range) {
+    if (range < value) return LATTICE_STATE_ERR_OVERFLOW_CELL;
+    if (range == 0) return LATTICE_STATE_ERR_DIV_ZERO;
+    value = value / range;
+    return Lattice_Write(Y, Z, value);
+}
+int Lattice_Write(int Y, int Z, int value, int range) {
+    if (range < value) return LATTICE_STATE_ERR_OVERFLOW_CELL;
+    if (range == 0) return LATTICE_STATE_ERR_DIV_ZERO;
+    CELL_TYPE val = (CELL_TYPE)value / (CELL_TYPE)range;
+    return Lattice_Write(Y, Z, val);
+}
+
 int Lattice_Read(int Y, int Z, CELL_TYPE* output) {
     int idx = get_mem_pos(xMax - 1, Y, Z);
     if (idx < 0 || idx >= MAX) return LATTICE_STATE_ERR_BAD_CELL_POS;
     *output = cells[idx].charge;
+    return LATTICE_STATE_OKAY;
+}
+int Lattice_Read(int Y, int Z, CELL_TYPE range, CELL_TYPE* output) {
+    int flag = Lattice_Read(Y, Z, output);
+    if (flag != LATTICE_STATE_OKAY) return flag;
+    *output *= range;
+    return LATTICE_STATE_OKAY;
+}
+int Lattice_Read(int Y, int Z, int range, int* output) {
+    CELL_TYPE out = 0;
+    int flag = Lattice_Read(Y, Z, &out);
+    if (flag != LATTICE_STATE_OKAY) return flag;
+
+    *output = (int)(out * range);
+    return LATTICE_STATE_OKAY;
+}
+
+int Lattice_Start_Integration() {
+    isIntegrating = 1;
+    return LATTICE_STATE_OKAY;
+}
+int Lattice_Stop_Integration() {
+    isIntegrating = 0;
     return LATTICE_STATE_OKAY;
 }

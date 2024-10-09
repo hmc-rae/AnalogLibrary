@@ -1,0 +1,3 @@
+﻿  LinearSearch.cpp
+D:\Files\Programming\Projects\AnalogLibrary\sample\LinearSearch\LinearSearch\LinearSearch.cpp(20,27): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  LinearSearch.vcxproj -> D:\Files\Programming\Projects\AnalogLibrary\sample\LinearSearch\x64\Debug\LinearSearch.exe

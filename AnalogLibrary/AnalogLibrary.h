@@ -32,16 +32,18 @@
 #define LATTICE_PROG_CONNECT_NZ 5					// Negative Z connection
 
 // Connection program flags
-#define LATTICE_PROG_CONNECT_CONFIG_ACTIVE 8		// This connection is active (in general)
 #define LATTICE_PROG_CONNECT_CONFIG_FLOW_POS 0		// Flows to the positive-axis cell. 
-#define LATTICE_PROG_CONNECT_CONFIG_FLOW_NEG 16		// Flows to the negative-axis cell.
+#define LATTICE_PROG_CONNECT_CONFIG_FLOW_NEG 8		// Flows to the negative-axis cell.
 
-#define LATTICE_PROG_CONNECT_CONFIG_MOD 32			// A modifier is active on this connection
-#define LATTICE_PROG_CONNECT_CONFIG_MOD_COEFF 0		// Coefficient modifier. Excludes divisor.
-#define LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS 64	// Divisor modifier. Excludes coefficient.
+#define LATTICE_PROG_CONNECT_CONFIG_MOD_MASK 48		// Mask modifier values
+#define LATTICE_PROG_CONNECT_CONFIG_MOD_COEFF 16	// Coefficient modifier. Multiplies input on line by this value.
+#define LATTICE_PROG_CONNECT_CONFIG_MOD_DIVIS 32	// Divisor modifier. 'Scales' input on line by this value. Creates a OVERFLOW_CELL error if the result is greater than 1, so use with caution.
+#define LATTICE_PROG_CONNECT_CONFIG_MOD_COMP 48		// Comparator modifier. Compares the input to the modifier value - -1 if the value is LESSER, 0 if EQUAL, and 1 if GREATER.
 
 #define LATTICE_PROG_CONNECT_CONFIG_INVERT 64		// Invert this line. Inclusive of any config
 #define LATTICE_PROG_CONNECT_CONFIG_ABSOLUTE 128	// Absolute this line. Inclusive of any config
+
+#define LATTICE_PROG_CONNECT_CONFIG_DEACTIVATE 256  // Disables this line.
 
 // Noise mode flags
 #define LATTICE_NOISE_MODE_NONE 0				// No noise is applied.
@@ -102,6 +104,11 @@ int SIMU_Lattice_NoiseMode(int mode);
 /// <param name="ts"></param>
 /// <returns></returns>
 int SIMU_Thread_Speed(double ts);
+/// <summary>
+/// Returns the estimated polling rate (in Hz) of the simulation.
+/// </summary>
+/// <returns></returns>
+int SIMU_Poll_Rate();
 
 // AnalogLibrary lattice functions: proper accessible functions for general use functions.
 
@@ -122,13 +129,27 @@ int Lattice_Program_Core(int X, int Y, int Z, int code);
 /// <param name="Z"></param>
 /// <param name="code"></param>
 /// <returns></returns>
-int Lattice_Program_Connect(int X, int Y, int Z, int code);
+int Lattice_Program_Connect(int X, int Y, int Z, int code); 
 /// <summary>
 /// Sets the current underbus value. Whenever a configuration is written that uses a set value, the underbus is used.
 /// </summary>
 /// <param name="charge"></param>
 /// <returns></returns>
 int Lattice_Program_SetUnderbus(CELL_TYPE charge);
+/// <summary>
+/// Sets the current underbus value to a corresponding value to the given range. Whenever a configuration is written that uses a set value, the underbus is used.
+/// </summary>
+/// <param name="value"></param>
+/// <param name="range"></param>
+/// <returns></returns>
+int Lattice_Program_SetUnderbus(CELL_TYPE value, CELL_TYPE range);
+/// <summary>
+/// Sets the current underbus value to a corresponding value to the given range. Whenever a configuration is written that uses a set value, the underbus is used.
+/// </summary>
+/// <param name="value"></param>
+/// <param name="range"></param>
+/// <returns></returns>
+int Lattice_Program_SetUnderbus(int value, int range);
 /// <summary>
 /// Inputs a value to {X=0, Y, Z} (input layer).
 /// </summary>
@@ -138,6 +159,24 @@ int Lattice_Program_SetUnderbus(CELL_TYPE charge);
 /// <returns></returns>
 int Lattice_Write(int Y, int Z, CELL_TYPE charge);
 /// <summary>
+/// Writes a given value scaled to the given range to the coordinates in the input layer.
+/// </summary>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <param name="value"></param>
+/// <param name="range"></param>
+/// <returns></returns>
+int Lattice_Write(int Y, int Z, CELL_TYPE value, CELL_TYPE range);
+/// <summary>
+/// Writes a given value scaled to the given range to the coordinates in the input layer.
+/// </summary>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <param name="value"></param>
+/// <param name="range"></param>
+/// <returns></returns>
+int Lattice_Write(int Y, int Z, int value, int range);
+/// <summary>
 /// Reads the value from cell {X=MAX-1, Y, Z} (output layer).
 /// </summary>
 /// <param name="Y"></param>/// 
@@ -145,3 +184,29 @@ int Lattice_Write(int Y, int Z, CELL_TYPE charge);
 /// <param name="output"></param>/// 
 /// <returns></returns>
 int Lattice_Read(int Y, int Z, CELL_TYPE* output);
+/// <summary>
+/// Reads a value from the given coordinates on the output layer and scales it to the given range.
+/// </summary>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <param name="range"></param>
+/// <param name="output"></param>
+/// <returns></returns>
+int Lattice_Read(int Y, int Z, CELL_TYPE range, CELL_TYPE* output);
+/// <summary>
+/// Reads a value from the given coordinates on the output layer and scales it to the given range.
+/// </summary>
+/// <param name="Y"></param>
+/// <param name="Z"></param>
+/// <param name="range"></param>
+/// <param name="output"></param>
+/// <returns></returns>
+int Lattice_Read(int Y, int Z, int range, int* output);
+/// <summary>
+/// Unlocks all integrators, allowing them to operate.
+/// </summary>/// <returns></returns>
+int Lattice_Start_Integration();
+/// <summary>
+/// Locks all integrators, forcing them to hold their current value.
+/// </summary>/// <returns></returns>
+int Lattice_Stop_Integration();

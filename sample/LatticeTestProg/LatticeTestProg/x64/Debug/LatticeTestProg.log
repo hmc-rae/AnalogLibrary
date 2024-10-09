@@ -1,3 +1,4 @@
 ﻿  LatticeTestProg.cpp
+D:\Files\Programming\Projects\AnalogLibrary\sample\LatticeTestProg\LatticeTestProg\LatticeTestProg.cpp(29,13): warning C4305: '=': truncation from 'double' to 'float'
   LatticeTestProg.vcxproj -> D:\Files\Programming\Projects\AnalogLibrary\sample\LatticeTestProg\x64\Debug\LatticeTestProg.exe
           1 file(s) copied.
